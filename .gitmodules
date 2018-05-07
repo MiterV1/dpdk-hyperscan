@@ -1,0 +1,6 @@
+[submodule "dpdk"]
+	path = dpdk
+	url = https://github.com/DPDK/dpdk.git
+[submodule "hyperscan"]
+	path = hyperscan
+	url = https://github.com/intel/hyperscan.git
