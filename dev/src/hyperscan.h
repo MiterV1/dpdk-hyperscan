@@ -33,6 +33,14 @@
 #include <rte_tcp.h>
 #include <rte_udp.h>
 
+struct l2fwd_ipv4_5tuple {
+    uint32_t ip_dst;
+    uint32_t ip_src;
+    uint16_t port_dst;
+    uint16_t port_src;
+    uint8_t  proto;
+} __attribute__((__packed__));
+
 struct matched_data {
     hash_sig_t hash;
     struct rte_hash *handle;

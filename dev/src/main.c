@@ -83,15 +83,7 @@
 #include "ui.h"
 #include "l2hy-pcap.h"
 #include "hyperscan.h"
-#define HASH_ENTRIES (1024*4)
-
-struct l2fwd_ipv4_5tuple {
-    uint32_t ip_dst;
-    uint32_t ip_src;
-    uint16_t port_dst;
-    uint16_t port_src;
-    uint8_t  proto;
-} __attribute__((__packed__));
+#define HASH_ENTRIES (1024*40)
 
 static inline void l2fwd_parse_ipv4_5tuple(struct rte_mbuf *m, struct l2fwd_ipv4_5tuple *tuple);
 /***********************************************************/
@@ -205,14 +197,14 @@ print_stats(void)
         total_packets_tx += port_statistics[portid].tx;
         total_packets_rx += port_statistics[portid].rx;
     }
-    printf("\nAggregate statistics ==============================="
-           "\nTotal packets filterd: %15"PRIu64
-           "\nTotal packets received: %14"PRIu64
-           "\nTotal packets dropped: %15"PRIu64,
-           total_packets_tx,
-           total_packets_rx,
-           total_packets_dropped);
-    printf("\n====================================================\n");
+//    printf("\nAggregate statistics ==============================="
+//           "\nTotal packets filterd: %15"PRIu64
+//           "\nTotal packets received: %14"PRIu64
+//           "\nTotal packets dropped: %15"PRIu64,
+//           total_packets_tx,
+//           total_packets_rx,
+//           total_packets_dropped);
+//    printf("\n====================================================\n");
 }
 
 static void
@@ -351,7 +343,7 @@ l2fwd_main_loop(void)
          * Read packet from RX queues
          */
         struct ether_hdr *eth_hdr;
-	uint16_t ether_type;
+        uint16_t ether_type;
 
         for (i = 0; i < qconf->n_rx_port; i++) {
             portid = qconf->rx_port_list[i];
@@ -363,57 +355,67 @@ l2fwd_main_loop(void)
                 m = pkts_burst[j];
                 rte_prefetch0(rte_pktmbuf_mtod(m, void *));
 
-		eth_hdr = rte_pktmbuf_mtod(m, struct ether_hdr *);
-		ether_type = eth_hdr->ether_type;
-		if (ether_type != rte_cpu_to_be_16(ETHER_TYPE_IPv4)) {
-			goto FREE_TX;
-		}
+                eth_hdr = rte_pktmbuf_mtod(m, struct ether_hdr *);
+                ether_type = eth_hdr->ether_type;
+                if (ether_type != rte_cpu_to_be_16(ETHER_TYPE_IPv4)) {
+                    goto FREE_TX;
+                }
 
-		if (ether_type == rte_cpu_to_be_16(ETHER_TYPE_ARP)) {
-			goto FREE_TX;
+                if (ether_type == rte_cpu_to_be_16(ETHER_TYPE_ARP)) {
+                    goto FREE_TX;
                 }
                 l2fwd_parse_ipv4_5tuple(m, &tuple);
-		//printf("tuple.port_src=%d, tuple.port_dst=%d, tuple.proto=%d\n", tuple.port_src, tuple.port_dst, tuple.proto);
+		        //printf("tuple.port_src=%d, tuple.port_dst=%d, tuple.proto=%d\n", tuple.port_src, tuple.port_dst, tuple.proto);
 
-		if (is_ui_port_filter_enabled()) {
-			if (tuple.port_src == get_ui_port_filter_src_port() || tuple.port_dst == get_ui_port_filter_dst_port()) {
-                    		dump_pcap_write(m);
-                                port_statistics[portid].tx++;
-				goto FREE_TX;
-			}
-		}
+                if (is_ui_port_filter_enabled()) {
+                    if (tuple.port_src == get_ui_port_filter_src_port() || tuple.port_dst == get_ui_port_filter_dst_port()) {
+                        dump_pcap_write(m);
+                        port_statistics[portid].tx++;
+                        goto FREE_TX;
+                    }
+                }
 
-		if (is_ui_proto_filter_enabled()) {
-                     int proto = get_ui_proto_filter_protocol();
-                     if (proto == 1) {
-                         proto = 6; // tcp
-                     } else {
-                         proto = 17; // udp
-                     }
-			if (tuple.proto == proto) {
-                    		dump_pcap_write(m);
-                                port_statistics[portid].tx++;
-				goto FREE_TX;
-			}
-		}
+                if (is_ui_proto_filter_enabled()) {
+                    int proto = get_ui_proto_filter_protocol();
+                    if (proto == 1) {
+                        proto = 6; // tcp
+                    } else {
+                        proto = 17; // udp
+                    }
+                    if (tuple.proto == proto) {
+                        dump_pcap_write(m);
+                        port_statistics[portid].tx++;
+                        goto FREE_TX;
+                    }
+                }
 
-		if (is_ui_app_filter_enabled()) {
-			m_data.hash = rte_hash_hash(m_data.handle, &tuple);
-                        m_data.tuple = &tuple;
-			int ret = rte_hash_lookup_with_hash(m_data.handle, &tuple, m_data.hash);
-			if (ret > 0) {
-			    dump_pcap_write(m);
-			} else {
-                            hyperscan_scan(m, &m_data);
-                            port_statistics[portid].tx++;
-			}
-		}
+            	if (is_ui_app_filter_enabled()) {
+            		m_data.hash = rte_hash_hash(m_data.handle, &tuple);
+                    m_data.tuple = &tuple;
+
+                    // QQ端口 UDP传输方式
+                    if (m_data.tuple.port_dst == 8000 || (m_data.tuple.port_src > 4000 && m_data.tuple.port_src < 4010)) {
+                        dump_pcap_write(m);
+                        port_statistics[portid].tx++;
+            			goto FREE_TX;
+                    }
+
+            		int ret = rte_hash_lookup_with_hash(m_data.handle, &tuple, m_data.hash);
+            		if (ret > 0) {
+            		    dump_pcap_write(m);
+                        port_statistics[portid].tx++;
+                        goto FREE_TX;
+            		} else {
+                        hyperscan_scan(m, &m_data);
+            		}
+                }
 FREE_TX:
                 l2fwd_simple_forward(m, portid);
             }
-	}
+	    }
     }
 }
+
 static int
 l2fwd_launch_one_lcore(__attribute__((unused)) void *dummy)
 {

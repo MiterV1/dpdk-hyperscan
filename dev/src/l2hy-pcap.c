@@ -56,7 +56,7 @@ void dump_pcap_init(void)
     }
 
     sprintf(buffer, "./filter_dump%02d.pcap", pcap_id++);
-    pcap_fd = open(buffer, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
+    pcap_fd = open(buffer, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR | S_IROTH | S_IWOTH);
     //if (!pcap_fd) {
         //return -1;
     //}
@@ -75,7 +75,7 @@ int dump_pcap_write(struct rte_mbuf *bufptr)
 
     if (total_write >= MAX_FILE_SIZE) {
         dump_pcap_init();
-	total_write = 0;
+	    total_write = 0;
     }
 
     gettimeofday(&tv, NULL);

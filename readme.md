@@ -48,3 +48,7 @@ static int eventHandler(unsigned int id, unsigned long long from,
     return 0;
 }
 ```
+
+### 4. GTK3.0 GUI界面
+使用GTK3.0添加前端界面与后端程序进行交互，效果如图所示：
+![gui](https://raw.githubusercontent.com/miterv1/dpdk-hyperscan/master/pic/UI.png
