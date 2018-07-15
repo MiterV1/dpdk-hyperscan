@@ -1,0 +1,4 @@
+0:/qq/
+1:/weibo/
+2:/weixin/
+3:/nginx/
